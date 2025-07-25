@@ -45,5 +45,5 @@ def answer_question(query: Query):
 
     return {
         "answer": answer,
-        "sources": [documents[i] for i in indices[0]]
+        "sources": [documents[i] for i in indices[0]] # Include the sources of the answer
     }

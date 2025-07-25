@@ -44,6 +44,6 @@ def answer_question(query: Query):
     answer = tokenizer.decode(output[0], skip_special_tokens=True)
 
     return {
-        "answer": answer,
+        "answer": answer, # Generated answer from BioGPT
         "sources": [documents[i] for i in indices[0]] # Include the sources of the answer
     }

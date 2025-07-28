@@ -18,7 +18,7 @@ def get_dataset(max_samples=10000):
             })
 
     os.makedirs("data", exist_ok=True)
-    with open("data/pubmed_docs.json", "w", encoding="utf-8") as f:
+    with open("data/dataset.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 
     print(f"{len(results)} örnek başariyla kaydedildi")

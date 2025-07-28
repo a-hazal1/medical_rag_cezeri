@@ -18,7 +18,7 @@ def get_dataset(max_samples=10000):
             })
 
     os.makedirs("data", exist_ok=True)
-    with open("data/dataset.json", "w", encoding="utf-8") as f:
+    with open("data/dataset.json", "w", encoding="utf-8") as f: #dataset bu adrestedir -> https://drive.google.com/drive/u/0/folders/1Yp20WxNSLKWAO4WRPA3_HOThAy2m19SZ
         json.dump(results, f, ensure_ascii=False, indent=2)
 
     print(f"{len(results)} örnek başariyla kaydedildi")

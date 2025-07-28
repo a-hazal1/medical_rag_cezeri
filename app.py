@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from rag_engine2 import ask_medical_question
+from rag_engine import ask_medical_question
 
 app = FastAPI()
 

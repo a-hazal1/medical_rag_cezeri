@@ -7,7 +7,7 @@ torch
 llama-index[llms]>=0.10.28
 llama-index-llms-ollama
 llama-index-embeddings-huggingface
-sentence-transformers
 sacremoses 
 protobuf
-
+requests
+evaluate

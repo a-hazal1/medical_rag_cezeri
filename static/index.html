@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Medical RAG Arayüzü</title>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: 40px auto; padding: 20px; }
+    textarea { width: 100%; height: 100px; }
+    button { margin-top: 10px; padding: 10px 20px; }
+    .response { margin-top: 20px; background: #f9f9f9; padding: 10px; border-left: 3px solid #007acc; }
+  </style>
+</head>
+<body>
+  <h1>Medical RAG Asistanı</h1>
+  <textarea id="question" placeholder="Bir tıbbi soru girin..."></textarea><br/>
+  <button onclick="sendQuestion()">Sor</button>
+
+  <div class="response" id="answerBox"></div>
+
+  <script>
+    async function sendQuestion() {
+      const question = document.getElementById("question").value.trim();
+      const responseDiv = document.getElementById("answerBox");
+      responseDiv.innerHTML = "Yanıt bekleniyor...";
+
+      try {
+        const res = await fetch("http://localhost:8000/query", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ question })
+        });
+
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+        const data = await res.json();
+
+        responseDiv.innerHTML = `
+          <strong>Soru:</strong> ${data.query}<br/>
+          <strong>Cevap:</strong> ${data.answer}<br/>
+          <hr/>
+          <em>Delays:</em><br/>
+          Retrieval: ${data.retrieval_time_ms} ms<br/>
+          Generation: ${data.generation_time_ms} ms<br/>
+          Total: ${data.total_time_ms} ms
+        `;
+      } catch (err) {
+        responseDiv.innerHTML = "Bir hata oluştu.";
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>

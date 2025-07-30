@@ -1,49 +1,92 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
-import faiss
-import json
-import numpy as np
+from fastapi import FastAPI #fastapi kütüphanesi
+from pydantic import BaseModel #sorgu modeli için pydantic
+from sentence_transformers import SentenceTransformer #embedding için sentence-transformers
+import faiss #faiss kütüphanesi
+import json 
+import numpy as np 
+import requests 
+import time 
+from fastapi.middleware.cors import CORSMiddleware 
+from fastapi.staticfiles import StaticFiles #frontend dosyaları için
 
 app = FastAPI()
 
-# FAISS index'i ve belgeleri yükle
+# CORS ayarları
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# FAISS index ve belgeler (sadece arama için, çıktıdan kaldırıyoruz)
 index = faiss.read_index("vector_index/faiss_index.index")
 with open("vector_index/docs.json", "r", encoding="utf-8") as f:
     documents = json.load(f)
 
-# Embedding modeli
+#embedding modeli
 embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
-# BioGPT modeli
-BIOGPT_MODEL = "microsoft/BioGPT"
-tokenizer = AutoTokenizer.from_pretrained(BIOGPT_MODEL)
-model = AutoModelForCausalLM.from_pretrained(BIOGPT_MODEL)
+#ollama ayarları
+OLLAMA_URL = "http://host.docker.internal:11434/api/generate"
+OLLAMA_MODEL = "mistral"
 
-class Query(BaseModel):
+class Query(BaseModel):#sorgu modeli
     question: str
 
+#sorgu uzunluk sınıflandırması
+def get_query_length_label(query: str) -> str:
+    wc = len(query.split()) # kelime sayısı
+    if wc <= 5:
+        return "Short"
+    elif wc <= 12:
+        return "Medium"
+    else:
+        return "Long"
+
 @app.post("/query")
-def answer_question(query: Query):
-    # Sorguyu embed et
-    vec = embedder.encode([query.question])
-    vec = np.array(vec).astype("float32")
+def answer_question(query: Query): #sorgu işleme fonksiyonu
+    start_time = time.time()
 
-    # En yakın 3 belgeyi bul
+    #Embed + FAISS
+    t0 = time.time()
+    vec = embedder.encode([query.question]).astype("float32")
     distances, indices = index.search(vec, 3)
+    retrieval_time = round((time.time() - t0) * 1000, 2)
 
-    # Abstract'ları birleştir
-    context = "\n".join([documents[i].get("abstract", "") for i in indices[0]])
+    #context oluştur 
+    context = "\n".join(documents[i].get("summary", "") for i in indices[0])
 
-    # BioGPT'ye prompt oluştur
-    prompt = f"Context:\n{context}\n\nQuestion: {query.question}\nAnswer:"
-    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-    output = model.generate(input_ids, max_new_tokens=150)
-    answer = tokenizer.decode(output[0], skip_special_tokens=True)
+    #prompt
+    prompt = f"""
+    Context:
+    {context}
 
+    Question: {query.question}
+    Answer:"""
+
+    #llm çağrısı
+    t1 = time.time()
+    resp = requests.post(OLLAMA_URL, json={
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+    })
+    t2 = time.time()
+    generation_time = round((t2 - t1) * 1000, 2)
+    total_time = round((time.time() - start_time) * 1000, 2)
+
+    #json cevabı
     return {
-        "answer": answer, # Generated answer from BioGPT
-        "sources": [documents[i] for i in indices[0]] # Include the sources of the answer
+        "query":             query.question,
+        "query_length":      len(query.question.split()),
+        "query_length_label": get_query_length_label(query.question),
+        "retrieval_time_ms": retrieval_time,
+        "generation_time_ms": generation_time,
+        "total_time_ms":     total_time,
+        "answer":            resp.json().get("response", "__no_response__").strip()
     }
+
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static") #frontend dosyaları
